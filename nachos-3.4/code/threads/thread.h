@@ -39,7 +39,6 @@
 
 #include "copyright.h"
 #include "utility.h"
-#include "synch.h"
 
 #ifdef USER_PROGRAM
 #include "machine.h"
@@ -80,7 +79,7 @@ class Thread {
     int machineState[MachineStateSize];  // all registers except for stackTop
 
   public:
-    Thread(char* debugName, unsigned parent = 0);		// initialize a Thread 
+    Thread(char* debugName);		// initialize a Thread 
     ~Thread(); 				// deallocate a Thread
 					// NOTE -- thread being deleted
 					// must not be running when delete 
@@ -106,10 +105,11 @@ class Thread {
 
 
 /*Begin code changes by Ian Callaway*/
-	unsigned Cycle();
-	Thread *GetParent();
+	int Cycle();
+	Thread *GetThread(int ID);
 	Thread *myThread;
-	const unsigned myID, parentID;
+	const int myID;
+	int parentID;
 /*End code changes by Ian Callaway*/
 
 
