@@ -42,11 +42,13 @@
 
 
 
+
 /*Begin code changes by Ian Callaway*/
-static unsigned IDs = 1;
-Thread::Thread(char* threadName, const unsigned parent) :
+
+static int IDs = 1;
+Thread::Thread(char* threadName) :
 	myID(IDs++),
-	parentID(parent)
+	parentID(-1)
 {
 	name = threadName;
     stackTop = NULL;
@@ -75,6 +77,7 @@ Thread::Thread(char* threadName, const unsigned parent) :
 
 Thread::~Thread()
 {
+	
 	if(myThread != this) {
 		for(Thread *ptr = myThread, *thread = 0; ptr != this; thread = ptr, ptr = ptr->myThread)
 			if(ptr->myThread == this)
@@ -85,23 +88,31 @@ Thread::~Thread()
 
     ASSERT(this != currentThread);
     if (stack != NULL)
-	DeallocBoundedArray((char *) stack, StackSize * sizeof(int));
+		DeallocBoundedArray((char *) stack, StackSize * sizeof(int));
 }
 
-unsigned Thread::Cycle() {
-	unsigned sum = 1;
+int Thread::Cycle() {
+	int sum = 1;
 	printf(":%d", this->myID);
 	for(Thread* ptr = this->myThread; ptr != this; ptr = ptr->myThread, sum++)
 		printf(".%d", ptr->myID);
 	return sum;
 }
 
-Thread* Thread::GetParent() {
-	for(Thread *ptr = this->myThread; ptr != this; ptr = ptr->myThread) if(ptr->myID == this->parentID) return ptr;
+Thread* Thread::GetThread(int ID) {
+	for(
+		Thread *ptr = this->myThread;
+		ptr != this; 
+		ptr = ptr->myThread) 
+		if(ptr->myID == ID) 
+			return ptr;
 	return 0;
 }
 
 /*End code changes by Ian Callaway*/
+
+
+
 
 
 
@@ -191,9 +202,9 @@ Thread::CheckOverflow()
 void
 Thread::Finish ()
 {
+    printf("\nFinishing thread %s", getName());
     (void) interrupt->SetLevel(IntOff);		
     ASSERT(this == currentThread);
-    
     DEBUG('t', "Finishing thread \"%s\"\n", getName());
     
     threadToBeDestroyed = currentThread;
@@ -231,8 +242,8 @@ Thread::Yield ()
     
     nextThread = scheduler->FindNextToRun();
     if (nextThread != NULL) {
-	scheduler->ReadyToRun(this);
-	scheduler->Run(nextThread);
+		scheduler->ReadyToRun(this);
+		scheduler->Run(nextThread);
     }
     (void) interrupt->SetLevel(oldLevel);
 }
