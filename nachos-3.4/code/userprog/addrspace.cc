@@ -30,6 +30,8 @@
 //	endian machine, and we're now running on a big endian machine.
 //----------------------------------------------------------------------
 
+
+
 static void 
 SwapHeader (NoffHeader *noffH)
 {
@@ -60,40 +62,30 @@ SwapHeader (NoffHeader *noffH)
 //	"executable" is the file containing the object code to load into memory
 //----------------------------------------------------------------------
 
+
+
+
+
+
+
+
+
+/*Begin changes by Ian Callaway*/
+
 //main memory bitmap
 static BitMap mainMemoryBits(32);
 
-
-int BestFit(unsigned frames) {
-	int bit = 32, size;
-	for(int i = 0, j; i < 32; i += j) {
-		i = mainMemoryBits.FreeSearch(i);
-		if((j = mainMemoryBits.FreeCount(i)) < size) {
-			bit = i;
-			size = j;
-		}
-	}
-	return bit;
-}
-
-int WorstFit(int frames) {
-	int bit = 32, size;
-	for(int i = 0, j; i < 32; i += j) {
-		i = mainMemoryBits.FreeSearch(i);
-		if((j = mainMemoryBits.FreeCount(i)) > size) {
-			bit = i;
-			size = j;
-		}
-	}
-	return bit;
-}
-
 int FirstFit(int frames) {
-	for(int i = 0, j; i < 32; i += j) {
-		i = mainMemoryBits.FreeSearch(i);
-		if((j = mainMemoryBits.FreeCount(i)) <= frames) return i;
+	for(int i = 0, j = 0, k = 0; i < 32; i ++) {
+		if(!mainMemoryBits.Test(i)) {
+			j++;
+			if(j == frames) return k;
+		} else {
+			k = i + 1;
+			j = 0;
+		}
 	}
-	return 32;
+	return -1;
 }
 
 AddrSpace::AddrSpace(OpenFile *executable)
@@ -135,26 +127,33 @@ AddrSpace::AddrSpace(OpenFile *executable)
 
     DEBUG('a', "Initializing address space, num pages %d, size %d\n", numPages, size);
 
-	unsigned offset = FirstFit(numPages);
-	for(unsigned j = 0; j < numPages; j++)
-		mainMemoryBits.Mark(j);
+	int offset = FirstFit(numPages);
+	printf("\n\tnumPages: %d\n\toffset: %d\n", numPages, offset);
+	valid = offset >= 0 && offset < 32;
 
 // first, set up the translation
     pageTable = new TranslationEntry[numPages];
-    for (i = 0; i < numPages; i++) {
+	for (i = 0; i < numPages; i++) {
+		if(valid) mainMemoryBits.Mark(offset + i);
 		pageTable[i].virtualPage = i;	// for now, virtual page # = phys page #
 		pageTable[i].physicalPage = i + offset;
-		pageTable[i].valid = TRUE;
+		pageTable[i].valid = valid ? TRUE : FALSE;
 		pageTable[i].use = FALSE;
 		pageTable[i].dirty = FALSE;
 		pageTable[i].readOnly = FALSE;  // if the code segment was entirely on 
 					// a separate page, we could set its 
 					// pages to be read-only
     }
+
+	if(!valid) {
+		printf("\nNot enough contiguous space.");
+		mainMemoryBits.PrintBits();
+		return;
+	}
     
 // zero out the entire address space, to zero the unitialized data segment 
 // and the stack segment
-    bzero(machine->mainMemory + offset, size + offset);
+    bzero(machine->mainMemory + (offset * PageSize), size);
 
 // then, copy in the code and data segments into memory
     if (noffH.code.size > 0) {
@@ -179,8 +178,23 @@ AddrSpace::AddrSpace(OpenFile *executable)
 
 AddrSpace::~AddrSpace()
 {
-   delete pageTable;
+	for(unsigned i = 0; i < numPages; i++) {
+		mainMemoryBits.Clear(pageTable[i].physicalPage);
+		pageTable[i].valid = 0;
+		pageTable[i].dirty = 0;
+	}
+	mainMemoryBits.PrintBits();
+	delete pageTable;
+	printf("\n\tReturn");
 }
+
+/*End changes by Ian Callaway*/
+
+
+
+
+
+
 
 //----------------------------------------------------------------------
 // AddrSpace::InitRegisters
