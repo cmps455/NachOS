@@ -64,33 +64,85 @@ SwapHeader (NoffHeader *noffH)
 
 
 
-
-
-
-
-
-
-/*Begin changes by Ian Callaway*/
-
 //main memory bitmap
 static BitMap mainMemoryBits(32);
+extern int fitFunction;
 
-int FirstFit(int frames) {
-	for(int i = 0, j = 0, k = 0; i < 32; i ++) {
-		if(!mainMemoryBits.Test(i)) {
-			j++;
-			if(j == frames) return k;
-		} else {
-			k = i + 1;
-			j = 0;
+/*Begin changes by Jaquincy Nelson*/
+
+int BestFit(int frames) {
+		printf("\nBest Fit");
+        int freeSpace = 0;
+        int minFreeSpace = 32;
+        int minIndex = 31;
+		int i = 0;		
+
+        for(; i < 32; i++){
+                if(!mainMemoryBits.Test(i)){
+                        freeSpace++;
+                }else{
+                        if(minFreeSpace > freeSpace && freeSpace >= frames){
+                                minFreeSpace = freeSpace;
+                                minIndex = i;
+                        }
+                        freeSpace =0;
+                }
+        }
+		if(minFreeSpace > freeSpace && freeSpace >= frames){
+			minFreeSpace = freeSpace;
+ 			minIndex = i - 1;
+        }
+        if(minFreeSpace >= frames){
+                return(minIndex - minFreeSpace + 1);
 		}
-	}
-	return -1;
+        return -1;
 }
 
+int WorstFit(int frames) {
+		printf("\nWorst Fit");
+        int freeSpace = 0;
+        int maxFreeSpace = 0;
+        int maxIndex = 0;
+		int i = 0;
+
+        for(; i < 32; i++){
+                if(!mainMemoryBits.Test(i)){
+                        freeSpace++;
+                }else{
+                        if(maxFreeSpace < freeSpace){
+                                maxFreeSpace = freeSpace;
+                                maxIndex = i;
+                        }
+                        freeSpace =0;
+                }
+        }
+        if(maxFreeSpace < freeSpace){
+               maxFreeSpace = freeSpace;
+               maxIndex = i - 1;
+        }
+        if(maxFreeSpace >= frames)
+                return(maxIndex - maxFreeSpace + 1);
+        return -1;
+}
+
+int FirstFit(int frames) {
+		printf("\nFirst Fit");
+        int freeSpace = 0;
+        for( int i = 0; i < 32; i++){
+                if(!mainMemoryBits.Test(i)){
+                        freeSpace++;
+                }else{
+                        freeSpace =0;
+                }
+                if(freeSpace >= frames)
+                        return(i - freeSpace + 1);
+        }
+        return -1;
+}
+
+/*Begin changes by Ian Callaway*/
 AddrSpace::AddrSpace(OpenFile *executable)
 {
-	mainMemoryBits.PrintBits();
 //idk what this does
     NoffHeader noffH;
 	
@@ -103,7 +155,12 @@ AddrSpace::AddrSpace(OpenFile *executable)
     if ((noffH.noffMagic != NOFFMAGIC) && 
 		(WordToHost(noffH.noffMagic) == NOFFMAGIC))
     	SwapHeader(&noffH);
-    ASSERT(noffH.noffMagic == NOFFMAGIC);
+    if(noffH.noffMagic != NOFFMAGIC) {
+		printf("\nFilename is not an executable file");
+		pageTable = 0;
+		code = 9;
+		return;
+	}
 
 //this is the address space in bytes
     size =
@@ -126,18 +183,18 @@ AddrSpace::AddrSpace(OpenFile *executable)
     ASSERT(numPages <= NumPhysPages);
 
     DEBUG('a', "Initializing address space, num pages %d, size %d\n", numPages, size);
-
-	int offset = FirstFit(numPages);
+	mainMemoryBits.PrintBits();
+	int offset = fitFunction == 0 ? FirstFit(numPages) : fitFunction == 1 ? BestFit(numPages) : fitFunction == 2 ? WorstFit(numPages) : 0;
 	printf("\n\tnumPages: %d\n\toffset: %d\n", numPages, offset);
-	valid = offset >= 0 && offset < 32;
+	code = offset >= 0 && offset < 32 ? 0 : 8;
 
 // first, set up the translation
     pageTable = new TranslationEntry[numPages];
 	for (i = 0; i < numPages; i++) {
-		if(valid) mainMemoryBits.Mark(offset + i);
+		if(code == 0) mainMemoryBits.Mark(offset + i);
 		pageTable[i].virtualPage = i;	// for now, virtual page # = phys page #
 		pageTable[i].physicalPage = i + offset;
-		pageTable[i].valid = valid ? TRUE : FALSE;
+		pageTable[i].valid = code == 0 ? TRUE : FALSE;
 		pageTable[i].use = FALSE;
 		pageTable[i].dirty = FALSE;
 		pageTable[i].readOnly = FALSE;  // if the code segment was entirely on 
@@ -145,7 +202,7 @@ AddrSpace::AddrSpace(OpenFile *executable)
 					// pages to be read-only
     }
 
-	if(!valid) {
+	if(code != 0) {
 		printf("\nNot enough contiguous space.");
 		mainMemoryBits.PrintBits();
 		return;
@@ -179,13 +236,12 @@ AddrSpace::AddrSpace(OpenFile *executable)
 AddrSpace::~AddrSpace()
 {
 	for(unsigned i = 0; i < numPages; i++) {
-		mainMemoryBits.Clear(pageTable[i].physicalPage);
+		if(code == 0) mainMemoryBits.Clear(pageTable[i].physicalPage);
 		pageTable[i].valid = 0;
 		pageTable[i].dirty = 0;
 	}
 	mainMemoryBits.PrintBits();
 	delete pageTable;
-	printf("\n\tReturn");
 }
 
 /*End changes by Ian Callaway*/
