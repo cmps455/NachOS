@@ -82,7 +82,9 @@ void SExit(int status) {
 			break;
 		case 7: printf("Write 0 byte");
 			break;
-		case 8: printf("NoContiguousAllocation");
+		case 8: printf("No Contiguous Allocation");
+			break;
+		case 9: printf("Program file is not an executable file");
 			break;
 		default: printf("UnknownExceptionType");
 			break;
@@ -96,7 +98,7 @@ void processCreator(int arg) {
 	currentThread->Yield();
 
 	char* filename = (char*)arg;
-	printf("\nCreating: %s", filename);
+	printf("\nCreating filename: %s, processID: %d", filename, currentThread->myID);
 	OpenFile *executable = fileSystem->Open(filename);
     AddrSpace *space;
 
@@ -106,9 +108,9 @@ void processCreator(int arg) {
     }
 	
 	space = new AddrSpace(executable);
-    if(!space->valid) {
-		delete space;
-		SExit(8);
+    if(0 != space->code) {
+		SExit(space->code);
+		return;
 	}
 
 	currentThread->space = space;
@@ -118,7 +120,6 @@ void processCreator(int arg) {
 
 	currentThread->space->InitRegisters();
 	currentThread->space->RestoreState();//load page table register
-
 	machine->Run();
 
 	ASSERT(FALSE);
@@ -159,16 +160,14 @@ ExceptionHandler(ExceptionType which)
 			case SC_Exit:
 				{
 					printf("\nExit: [%d]", currentThread->myID);
-					//IntStatus oldLevel = interrupt->SetLevel(IntOff);	// disable interrupts
+					IntStatus oldLevel = interrupt->SetLevel(IntOff);	// disable interrupts
 
 //wake up our parent if he's there
-					printf("\nSearching for parent: %d", currentThread->parentID);
 					Thread *parent = currentThread->GetThread(currentThread->parentID);
 					if(parent) {
-						printf("\nWaking up parent: %d", parent->myID);
 						scheduler->ReadyToRun(parent);
 					}
-					//(void) interrupt->SetLevel(oldLevel);	// re-enable interrupts
+					(void) interrupt->SetLevel(oldLevel);	// re-enable interrupts
 					SExit(0);
 					
 				}
@@ -182,10 +181,10 @@ ExceptionHandler(ExceptionType which)
 					
 					Thread *child = currentThread->GetThread(machine->ReadRegister(4));
 					if(child) {
-						printf("\nChild found, going to sleep");
+						printf("\nChild(%d) found, going to sleep", child->myID);
 						child->parentID = currentThread->myID;
 						currentThread->Sleep();
-						printf("\nParent awakened");
+						printf("\nParent(%d) awakened", currentThread->myID);
 					}
 					else {
 						printf("\nChild unfound, not going to sleep");
@@ -203,7 +202,6 @@ ExceptionHandler(ExceptionType which)
 					IntStatus oldLevel = interrupt->SetLevel(IntOff);
 					
 					Thread *child = new Thread("Exec");
-					printf("\nCreating: [%d]", child->myID);
 
 					machine->WriteRegister(2, child->myID);
 
@@ -277,6 +275,9 @@ ExceptionHandler(ExceptionType which)
 
 			default :
 			//Unprogrammed system calls end up here
+
+			printf("\nUnprogrammed system call arg1: %d", arg1);
+
 			break;
 		}         
 		break;
