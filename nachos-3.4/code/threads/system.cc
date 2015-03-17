@@ -19,6 +19,8 @@ Statistics *stats;			// performance metrics
 Timer *timer;				// the hardware timer device,
 					// for invoking context switches
 
+int fitFunction;
+
 #ifdef FILESYS_NEEDED
 FileSystem  *fileSystem;
 #endif
@@ -107,7 +109,18 @@ Initialize(int argc, char **argv)
 						// number generator
 	    randomYield = TRUE;
 	    argCount = 2;
+/*Begin changes by Jaquincy Nelson*/
+	}else if (!strcmp(*argv, "-M")) {
+	    //ASSERT(argc > 2);
+		printf(argv[1]);
+		if(argc > 1 && 0 == strcmp(argv[1], "2"))
+			printf("Best-fit algorithm is selected for memory allocation."), fitFunction = 1;
+		else if(argc > 1 && 0 == strcmp(argv[1], "3"))
+			printf("Worst-fit algorithm is selected for memory allocation."), fitFunction = 2;
+		else 
+			printf("First-fit algorithm is selected for memory allocation."), fitFunction = 0;
 	}
+/*End changes by Jaquincy Nelson*/
 #ifdef USER_PROGRAM
 	if (!strcmp(*argv, "-s"))
 	    debugUserProg = TRUE;
