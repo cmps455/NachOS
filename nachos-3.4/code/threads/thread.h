@@ -79,7 +79,7 @@ class Thread {
     int machineState[MachineStateSize];  // all registers except for stackTop
 
   public:
-    Thread(char* debugName);		// initialize a Thread 
+    Thread(char* debugName, int parent = -1);		// initialize a Thread 
     ~Thread(); 				// deallocate a Thread
 					// NOTE -- thread being deleted
 					// must not be running when delete 
@@ -100,16 +100,16 @@ class Thread {
     char* getName() { return (name); }
     void Print() { printf("%s, ", name); }
 
-
+	int IsBlocked() {return status == BLOCKED; }
 
 
 
 /*Begin code changes by Ian Callaway*/
 	int Cycle();
 	Thread *GetThread(int ID);
+	Thread *GetChild(int ID);
 	Thread *myThread;
-	const int myID;
-	int parentID;
+	const int myID, parentID;
 /*End code changes by Ian Callaway*/
 
 
