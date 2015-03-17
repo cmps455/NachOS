@@ -51,23 +51,6 @@ class BitMap {
     // write the bitmap to a file
     void FetchFrom(OpenFile *file); 	// fetch contents from disk 
     void WriteBack(OpenFile *file); 	// write contents to disk
-	void PrintBits() {
-		printf("\nmain: ");
-		for(int i = 0; i < numBits; i++)
-			printf("%c ", Test(i) ? '1' : '0');
-	}
-	int FreeSearch(int i) {
-		for(; i < numBits; i++)
-			if(!Test(i))
-				return i;
-		return numBits;
-	}
-	int FreeCount(int i) {
-		for(int j = 0; i < numBits; i++)
-			if(!Test(i)) j++;
-			else return j;
-		return numBits;
-	}
   private:
     int numBits;			// number of bits in the bitmap
     int numWords;			// number of words of bitmap storage
