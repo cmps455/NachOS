@@ -23,18 +23,32 @@
 void
 StartProcess(char *filename)
 {
-    OpenFile *executable = fileSystem->Open(filename);
+	
+	printf("Process 1 is loading.");
+	
+	OpenFile *executable = fileSystem->Open(filename);
     AddrSpace *space;
 
     if (executable == NULL) {
-		printf("Unable to open file %s\n", filename);
+		printf("\nUnable to open file %s\n", filename);
 		return;
     }
-	//move magic into start process
-    space = new AddrSpace(executable);    
+	
+	space = new AddrSpace(executable);
     currentThread->space = space;
-
-    delete executable;			// close file
+	delete executable;			// close file
+	if(0 != space->code) {
+		printf("\nProcess exited abnormally: ");
+		switch(space->code) {
+			case 8: printf("No Contiguous Allocation");
+				break;
+			case 9: printf("Program file is not an executable file");
+				break;
+		}
+		delete space;
+		return;
+	}
+    
 
     space->InitRegisters();		// set the initial register values
     space->RestoreState();		// load page table register
