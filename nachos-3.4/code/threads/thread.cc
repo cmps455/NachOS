@@ -105,7 +105,7 @@ Thread::~Thread()
 		DeallocBoundedArray((char *) stack, StackSize * sizeof(int));
 }
 
-int Thread::Cycle() {
+int Thread::Cycle () {
 	int sum = 1;
 	threadSema.P();
 	printf(":%d", this->myID);
@@ -115,13 +115,27 @@ int Thread::Cycle() {
 	return sum;
 }
 
-Thread* Thread::GetThread(int ID) {
+Thread* Thread::GetThread (int ID) {
 	threadSema.P();
 	for(
 		Thread *ptr = this->myThread;
 		ptr != this; 
 		ptr = ptr->myThread) 
 		if(ptr->myID == ID){ 
+			threadSema.V();
+			return ptr;
+		}
+	threadSema.V();
+	return 0;
+}
+
+Thread* Thread::GetChild (int ID) {
+	threadSema.P();
+	for(
+		Thread *ptr = this->myThread;
+		ptr != this; 
+		ptr = ptr->myThread)
+		if(ptr->parentID == ID){ 
 			threadSema.V();
 			return ptr;
 		}
