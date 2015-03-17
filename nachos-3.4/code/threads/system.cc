@@ -117,8 +117,10 @@ Initialize(int argc, char **argv)
 			printf("Best-fit algorithm is selected for memory allocation."), fitFunction = 1;
 		else if(argc > 1 && 0 == strcmp(argv[1], "3"))
 			printf("Worst-fit algorithm is selected for memory allocation."), fitFunction = 2;
-		else 
+		else if(argc > 1 && 0 == strcmp(argv[1], "1"))
 			printf("First-fit algorithm is selected for memory allocation."), fitFunction = 0;
+		else
+			printf("Input error, First-fit algorithm is selected for memory allocation"), fitFunction = 0;
 	}
 /*End changes by Jaquincy Nelson*/
 #ifdef USER_PROGRAM
