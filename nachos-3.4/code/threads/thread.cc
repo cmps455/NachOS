@@ -45,18 +45,22 @@
 
 /*Begin code changes by Ian Callaway*/
 
+static Semaphore threadSema("Threads", 1);
 static int IDs = 1;
-Thread::Thread(char* threadName) :
+Thread::Thread(char* threadName, int parent) :
 	myID(IDs++),
-	parentID(-1)
+	parentID(parent)
 {
+	printf("\nThread #%d created\n", this->myID);
 	name = threadName;
     stackTop = NULL;
     stack = NULL;
     status = JUST_CREATED;
+	threadSema.P();
 	this->myThread = currentThread ? currentThread->myThread : this;
 	if(currentThread) currentThread->myThread = this;
-	this->Cycle();
+	threadSema.V();
+	//this->Cycle();
     
 #ifdef USER_PROGRAM
     space = NULL;
@@ -78,12 +82,22 @@ Thread::Thread(char* threadName) :
 Thread::~Thread()
 {
 	
+	printf("\nThread #%d deleted\n", this->myID);
+
+	threadSema.P();
 	if(myThread != this) {
-		for(Thread *ptr = myThread, *thread = 0; ptr != this; thread = ptr, ptr = ptr->myThread)
-			if(ptr->myThread == this)
+		for(
+				Thread *ptr = this->myThread, *thread = 0; 
+				ptr != this; 
+				thread = ptr, ptr = ptr->myThread) {
+			if(ptr->myThread == this) {
 				ptr->myThread = this->myThread;
+				break;
+			}
+		}
 	}
-	
+	threadSema.V();
+
     DEBUG('t', "Deleting thread \"%s\"\n", name);
 
     ASSERT(this != currentThread);
@@ -93,19 +107,25 @@ Thread::~Thread()
 
 int Thread::Cycle() {
 	int sum = 1;
+	threadSema.P();
 	printf(":%d", this->myID);
 	for(Thread* ptr = this->myThread; ptr != this; ptr = ptr->myThread, sum++)
 		printf(".%d", ptr->myID);
+	threadSema.V();
 	return sum;
 }
 
 Thread* Thread::GetThread(int ID) {
+	threadSema.P();
 	for(
 		Thread *ptr = this->myThread;
 		ptr != this; 
 		ptr = ptr->myThread) 
-		if(ptr->myID == ID) 
+		if(ptr->myID == ID){ 
+			threadSema.V();
 			return ptr;
+		}
+	threadSema.V();
 	return 0;
 }
 
@@ -202,7 +222,7 @@ Thread::CheckOverflow()
 void
 Thread::Finish ()
 {
-    printf("\nFinishing thread %s", getName());
+    printf("\nFinishing thread %s #%d\n", getName(), myID);
     (void) interrupt->SetLevel(IntOff);		
     ASSERT(this == currentThread);
     DEBUG('t', "Finishing thread \"%s\"\n", getName());
@@ -358,7 +378,7 @@ void
 Thread::SaveUserState()
 {
     for (int i = 0; i < NumTotalRegs; i++)
-	userRegisters[i] = machine->ReadRegister(i);
+		userRegisters[i] = machine->ReadRegister(i);
 }
 
 //----------------------------------------------------------------------
@@ -374,6 +394,6 @@ void
 Thread::RestoreUserState()
 {
     for (int i = 0; i < NumTotalRegs; i++)
-	machine->WriteRegister(i, userRegisters[i]);
+		machine->WriteRegister(i, userRegisters[i]);
 }
 #endif
