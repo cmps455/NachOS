@@ -46,9 +46,6 @@ ThreadTest()
    	(new Thread("forked thread"))->Fork(SimpleThread, 5);
    	(new Thread("forked thread"))->Fork(SimpleThread, 6);
 	
-	Thread *ptr = new Thread("child", 4);
-	ptr->Fork(SimpleThread, 3);
-   	ptr = ptr->GetParent();
-	printf("parent: %d", ptr->myID);
+	
 }
 
