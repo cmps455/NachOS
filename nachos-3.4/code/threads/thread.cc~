@@ -40,20 +40,33 @@
 
 
 
-
-
 /*Begin code changes by Ian Callaway*/
-static unsigned IDs = 1;
-Thread::Thread(char* threadName, const unsigned parent) :
-	myID(IDs++), parentID(parent)
+
+Semaphore threadSema("Threads", 1);
+int IDs = 1;
+Semaphore IDSema("IDs", 1);
+
+int GetID() {
+	IDSema.P();
+	int result = IDs++;
+	IDSema.V();
+	return result;
+}
+
+Thread::Thread(char* threadName) :
+	myID(GetID()),
+	parentID(-1)
 {
+	printf("\nThread #%d created\n", this->myID);
 	name = threadName;
     stackTop = NULL;
     stack = NULL;
     status = JUST_CREATED;
+	threadSema.P();
 	this->myThread = currentThread ? currentThread->myThread : this;
 	if(currentThread) currentThread->myThread = this;
-	this->Cycle();
+	threadSema.V();
+	//this->Cycle();
     
 #ifdef USER_PROGRAM
     space = NULL;
@@ -74,33 +87,78 @@ Thread::Thread(char* threadName, const unsigned parent) :
 
 Thread::~Thread()
 {
-	if(myThread != this) {
-		for(Thread *ptr = myThread, *thread = 0; ptr != this; thread = ptr, ptr = ptr->myThread)
-			if(ptr->myThread == this)
-				ptr->myThread = this->myThread;
-	}
 	
+	printf("\nThread #%d deleted\n", this->myID);
+
+	threadSema.P();
+	if(myThread != this) {
+		for(
+				Thread *ptr = this->myThread, *thread = 0; 
+				ptr != this; 
+				thread = ptr, ptr = ptr->myThread) {
+			if(ptr->myThread == this) {
+				ptr->myThread = this->myThread;
+				break;
+			}
+		}
+	}
+	threadSema.V();
+
     DEBUG('t', "Deleting thread \"%s\"\n", name);
 
     ASSERT(this != currentThread);
     if (stack != NULL)
-	DeallocBoundedArray((char *) stack, StackSize * sizeof(int));
+		DeallocBoundedArray((char *) stack, StackSize * sizeof(int));
+	if (space)
+		delete space;
+	space = 0;
 }
 
-unsigned Thread::Cycle() {
-	unsigned sum = 1;
+int Thread::Cycle () {
+	int sum = 1;
+	threadSema.P();
 	printf(":%d", this->myID);
 	for(Thread* ptr = this->myThread; ptr != this; ptr = ptr->myThread, sum++)
 		printf(".%d", ptr->myID);
+	threadSema.V();
 	return sum;
 }
 
-Thread* Thread::GetParent() {
-	for(Thread *ptr = this->myThread; ptr != this; ptr = ptr->myThread) if(ptr->myID == this->parentID) return ptr;
-	return 0;
+Thread* Thread::GetThread (int ID) {
+	Thread *result = 0;
+	threadSema.P();
+	for(
+		Thread *ptr = this->myThread;
+		ptr != this; 
+		ptr = ptr->myThread) 
+		if(ptr->myID == ID){
+			result = ptr;
+			break;
+		}
+	threadSema.V();
+	return result;
 }
 
+Thread* Thread::GetParent () {
+	Thread *result = 0;
+	threadSema.P();
+	for(
+		Thread *ptr = this->myThread;
+		ptr != this; 
+		ptr = ptr->myThread)
+		if(ptr->myID == parentID){
+			result = ptr;
+			break;
+		}
+	threadSema.V();
+	return result;
+}
+
+
 /*End code changes by Ian Callaway*/
+
+
+
 
 
 
@@ -190,9 +248,9 @@ Thread::CheckOverflow()
 void
 Thread::Finish ()
 {
+    printf("\nFinishing thread %s #%d\n", getName(), myID);
     (void) interrupt->SetLevel(IntOff);		
     ASSERT(this == currentThread);
-    
     DEBUG('t', "Finishing thread \"%s\"\n", getName());
     
     threadToBeDestroyed = currentThread;
@@ -230,8 +288,8 @@ Thread::Yield ()
     
     nextThread = scheduler->FindNextToRun();
     if (nextThread != NULL) {
-	scheduler->ReadyToRun(this);
-	scheduler->Run(nextThread);
+		scheduler->ReadyToRun(this);
+		scheduler->Run(nextThread);
     }
     (void) interrupt->SetLevel(oldLevel);
 }
@@ -346,7 +404,7 @@ void
 Thread::SaveUserState()
 {
     for (int i = 0; i < NumTotalRegs; i++)
-	userRegisters[i] = machine->ReadRegister(i);
+		userRegisters[i] = machine->ReadRegister(i);
 }
 
 //----------------------------------------------------------------------
@@ -362,6 +420,6 @@ void
 Thread::RestoreUserState()
 {
     for (int i = 0; i < NumTotalRegs; i++)
-	machine->WriteRegister(i, userRegisters[i]);
+		machine->WriteRegister(i, userRegisters[i]);
 }
 #endif

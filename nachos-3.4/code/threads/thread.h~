@@ -39,7 +39,6 @@
 
 #include "copyright.h"
 #include "utility.h"
-#include "synch.h"
 
 #ifdef USER_PROGRAM
 #include "machine.h"
@@ -50,7 +49,6 @@
 // The SPARC and MIPS only need 10 registers, but the Snake needs 18.
 // For simplicity, this is just the max over all architectures.
 #define MachineStateSize 18 
-
 
 // Size of the thread's private execution stack.
 // WATCH OUT IF THIS ISN'T BIG ENOUGH!!!!!
@@ -81,7 +79,7 @@ class Thread {
     int machineState[MachineStateSize];  // all registers except for stackTop
 
   public:
-    Thread(char* debugName, unsigned parent = 0);		// initialize a Thread 
+    Thread(char* debugName);		// initialize a Thread 
     ~Thread(); 				// deallocate a Thread
 					// NOTE -- thread being deleted
 					// must not be running when delete 
@@ -102,16 +100,18 @@ class Thread {
     char* getName() { return (name); }
     void Print() { printf("%s, ", name); }
 
-
+	
 
 
 
 /*Begin code changes by Ian Callaway*/
-	unsigned Cycle();
+	int IsBlocked() {return status == BLOCKED; }
+	int Cycle();
+	Thread *GetThread(int ID);
 	Thread *GetParent();
 	Thread *myThread;
-	const unsigned myID, parentID;
-	Semaphore s;
+	const int myID;
+	int parentID;
 /*End code changes by Ian Callaway*/
 
 

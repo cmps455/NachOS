@@ -22,6 +22,8 @@ main()
 {
     int i, j, k;
 
+	Write("Running Matmult", 11, 1);	
+	
     for (i = 0; i < Dim; i++)		/* first initialize the matrices */
 	for (j = 0; j < Dim; j++) {
 	     A[i][j] = i;

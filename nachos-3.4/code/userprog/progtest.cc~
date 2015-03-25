@@ -20,26 +20,48 @@
 //	memory, and jump to it.
 //----------------------------------------------------------------------
 
-void
-StartProcess(char *filename)
-{
-    OpenFile *executable = fileSystem->Open(filename);
-    AddrSpace *space;
-
-    if (executable == NULL) {
-		printf("Unable to open file %s\n", filename);
-		return;
-    }
-    space = new AddrSpace(executable);    
-    currentThread->space = space;
-
-    delete executable;			// close file
-
-    space->InitRegisters();		// set the initial register values
-    space->RestoreState();		// load page table register
+void RunProc(int arg) {
+	currentThread->space->InitRegisters();		// set the initial register values
+    currentThread->space->RestoreState();		// load page table register
 
     machine->Run();			// jump to the user progam
     ASSERT(FALSE);			// machine->Run never returns;
+}
+
+void
+StartProcess(char *filename)
+{
+	
+	printf("Process 1 is loading.");
+	
+	OpenFile *executable = fileSystem->Open(filename);
+	//AddrSpace *space;
+
+	Thread *thread = new Thread("first");
+
+    if (executable == NULL) {
+		printf("\nUnable to open file %s\n", filename);
+		return;
+    }
+	
+	thread->space = new AddrSpace(executable);
+
+	delete executable;			// close file
+
+	if(0 != thread->space->code) {
+		printf("\nProcess exited abnormally: ");
+		switch(thread->space->code) {
+			case 8: printf("No Contiguous Allocation");
+				break;
+			case 9: printf("Program file is not an executable file");
+				break;
+		}
+		delete thread->space;
+		return;
+	}
+    
+	thread->Fork(RunProc, 0);
+    
 					// the address space exits
 					// by doing the syscall "exit"
 }

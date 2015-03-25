@@ -68,90 +68,18 @@ SwapHeader (NoffHeader *noffH)
 //main memory bitmap
 static BitMap mainMemoryBits(32);
 static Semaphore mainMemorySemaphore("Main Memory Semaphore", 1);
-extern int fitFunction;
-
-/*Begin changes by Jaquincy Nelson*/
-
-int BestFit(int frames) {
-        int freeSpace = 0;
-        int minFreeSpace = 32;
-        int minIndex = 31;
-		int i = 0;
-
-        for(; i < 32; i++){
-                if(!mainMemoryBits.Test(i)){
-                        freeSpace++;
-                }else{
-                        if(minFreeSpace > freeSpace && freeSpace >= frames){
-                                minFreeSpace = freeSpace;
-                                minIndex = i;
-                        }
-                        freeSpace =0;
-                }
-        }
-		if(minFreeSpace > freeSpace && freeSpace >= frames){
-			minFreeSpace = freeSpace;
- 			minIndex = i - 2;
-        }
-        if(minFreeSpace >= frames){
-                return(minIndex - minFreeSpace + 1);
-		}
-        return -1;
-}
-
-int WorstFit(int frames) {
-        int freeSpace = 0;
-        int maxFreeSpace = 0;
-        int maxIndex = 0;
-		int i = 0;
-
-        for(; i < 32; i++){
-                if(!mainMemoryBits.Test(i)){
-                        freeSpace++;
-                }else{
-                        if(maxFreeSpace < freeSpace){
-                                maxFreeSpace = freeSpace;
-                                maxIndex = i;
-                        }
-                        freeSpace =0;
-                }
-        }
-        if(maxFreeSpace < freeSpace){
-               maxFreeSpace = freeSpace;
-               maxIndex = i - 2;
-        }
-        if(maxFreeSpace >= frames)
-                return(maxIndex - maxFreeSpace + 1);
-        return -1;
-}
-
-int FirstFit(int frames) {
-        int freeSpace = 0;
-        for( int i = 0; i < 32; i++){
-                if(!mainMemoryBits.Test(i)){
-                        freeSpace++;
-                }else{
-                        freeSpace =0;
-                }
-                if(freeSpace >= frames)
-                        return(i - freeSpace + 1);
-        }
-        return -1;
-}
 
 /*Begin changes by Ian Callaway*/
 
-AddrSpace::AddrSpace(OpenFile *executable)
+AddrSpace::AddrSpace(OpenFile *executable) :
+	pageTable(0)
 {
 	mainMemorySemaphore.P();
-//idk what this does
     NoffHeader noffH;
 	
-//i is something,
 //size is like all the memory in bytes we're allocating for this
-    unsigned int size;
+    unsigned int byteSize;
 
-//ignore this wizardry
     executable->ReadAt((char *)&noffH, sizeof(noffH), 0);
     if ((noffH.noffMagic != NOFFMAGIC) && 
 		(WordToHost(noffH.noffMagic) == NOFFMAGIC))
@@ -163,65 +91,38 @@ AddrSpace::AddrSpace(OpenFile *executable)
 		return;
 	}
 
-//this is the address space in bytes
-    size =
-//size of the code that we have for some reason
-		noffH.code.size
-//size of the data that we have for some readon
-		+ noffH.initData.size
-//size of idk
-		+ noffH.uninitData.size
-//size of the stack
-		+ UserStackSize;
+    byteSize = noffH.code.size + noffH.initData.size + noffH.uninitData.size + UserStackSize;
 
-//the address space will be divided into pages
-    numPages = divRoundUp(size, PageSize);
+    numPages = divRoundUp(byteSize, PageSize);
 
 	printf("\nNeed %d memory frames.", numPages);
 
 //size is the address space in bytes but rounded up to a page
-    size = numPages * PageSize;
-
-//if there's not enough memory we kill this
-    ASSERT(numPages <= NumPhysPages);
-
-    DEBUG('a', "Initializing address space, num pages %d, size %d\n", numPages, size);
+    byteSize = numPages * PageSize;
 	
-	printf("\nMain[]  (pre-op): ");
+	printf("\nMain[](pre-op): ");
 	for(int i = 0; i < 32; i++)
 		printf("%c ", mainMemoryBits.Test(i) ? '1' : '0');
-
-	int offset = fitFunction == 0 ? FirstFit(numPages) : fitFunction == 1 ? BestFit(numPages) : fitFunction == 2 ? WorstFit(numPages) : 0;
-	code = offset >= 0 && offset < 32 ? 0 : 8;
 
 // first, set up the translation
     pageTable = new TranslationEntry[numPages];
 	for (int i = 0; i < (signed)numPages; i++) {
 		if(code == 0) mainMemoryBits.Mark(offset + i);
 		pageTable[i].virtualPage = i;	// for now, virtual page # = phys page #
-		pageTable[i].physicalPage = i + offset;
-		pageTable[i].valid = code == 0 ? TRUE : FALSE;
+		pageTable[i].valid = FALSE;
 		pageTable[i].use = FALSE;
 		pageTable[i].dirty = FALSE;
 		pageTable[i].readOnly = FALSE;  // if the code segment was entirely on 
 					// a separate page, we could set its 
 					// pages to be read-only
     }
-	
-	if(code != 0) {
-		printf("\nNot enough contiguous space.");
-		printf("\nMain[]: ");
-		for(int i = 0; i < 32; i++)
-			printf("%c ", mainMemoryBits.Test(i) ? '1' : '0');
-		return;
-	}
     
 // zero out the entire address space, to zero the unitialized data segment 
 // and the stack segment
-	printf("\n%d frames found at frame: %d", numPages, offset);
-	printf("\nCleaning out address space");
-    bzero(machine->mainMemory + (offset * PageSize), size);
-
+	//printf("\n%d frames found at frame: %d", numPages, offset);
+	//printf("\nCleaning out address space");
+    //bzero(machine->mainMemory + (offset * PageSize), byteSize);
+/*
 // then, copy in the code and data segments into memory
     if (noffH.code.size > 0) {
         DEBUG('a', "Initializing code segment, at 0x%x, size %d\n", 
@@ -234,8 +135,8 @@ AddrSpace::AddrSpace(OpenFile *executable)
 			noffH.initData.virtualAddr, noffH.initData.size);
         executable->ReadAt(&(machine->mainMemory[noffH.initData.virtualAddr + (offset * PageSize)]),
 			noffH.initData.size, noffH.initData.inFileAddr);
-    }
-	printf("\nMain[] (post-op): ");
+    }*/
+	printf("\nMain[](post-op): ");
 	for(int i = 0; i < 32; i++)
 		printf("%c ", mainMemoryBits.Test(i) ? '1' : '0');
 	mainMemorySemaphore.V();
@@ -254,10 +155,11 @@ AddrSpace::~AddrSpace()
 		pageTable[i].valid = 0;
 		pageTable[i].dirty = 0;
 	}
-	printf("\nMain[]\t(done): ");
+	printf("\nMain[](done): ");
 	for(int i = 0; i < 32; i++)
 		printf("%c ", mainMemoryBits.Test(i) ? '1' : '0');
-	delete pageTable;
+	if(pageTable)
+		delete pageTable, pageTable = 0;
 	mainMemorySemaphore.V();
 }
 

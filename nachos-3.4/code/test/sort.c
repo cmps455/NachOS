@@ -16,6 +16,10 @@ main()
 {
     int i, j, tmp;
 
+	char * buffer[1024];
+	
+	Write("Running sort", 11, 1);
+
     /* first initialize the array, in reverse sorted order */
     for (i = 0; i < 1024; i++)		
         A[i] = 1024 - i;
@@ -28,5 +32,12 @@ main()
 	      A[j] = A[j + 1];
 	      A[j + 1] = tmp;
     	   }
-    Exit(A[0]);		/* and then we're done -- should be 0! */
+
+	Join(Exec("../test/halt"));	
+	//Exec("../test/halt");	
+	Join(Exec("../test/halt"));
+	//Yield();
+	//Yield();
+	
+	Exit(A[0]);		/* and then we're done -- should be 0! */
 }

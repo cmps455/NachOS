@@ -35,7 +35,7 @@ CPP = gcc -E
 INCDIR =-I../userprog -I../threads
 CFLAGS = -G 0 -c $(INCDIR)
 
-all: halt shell matmult sort
+all: halt shell matmult sort testexec test2 testexechalf testjoin test4 test5 testexit test7 testjoinhalf testexithalf
 
 start.o: start.s ../userprog/syscall.h
 	$(CPP) $(CPPFLAGS) start.c > strt.s
@@ -65,3 +65,63 @@ matmult.o: matmult.c
 matmult: matmult.o start.o
 	$(LD) $(LDFLAGS) start.o matmult.o -o matmult.coff
 	../bin/coff2noff matmult.coff matmult
+
+testexec.o: testexec.c
+	$(CC) $(CFLAGS) -c testexec.c
+testexec: testexec.o start.o
+	$(LD) $(LDFLAGS) start.o testexec.o -o testexec.coff
+	../bin/coff2noff testexec.coff testexec
+	
+test2.o: test2.c
+	$(CC) $(CFLAGS) -c test2.c
+test2: test2.o start.o
+	$(LD) $(LDFLAGS) start.o test2.o -o test2.coff
+	../bin/coff2noff test2.coff test2
+	
+testexechalf.o: testexechalf.c
+	$(CC) $(CFLAGS) -c testexechalf.c
+testexechalf: testexechalf.o start.o
+	$(LD) $(LDFLAGS) start.o testexechalf.o -o testexechalf.coff
+	../bin/coff2noff testexechalf.coff testexechalf
+	
+testjoin.o: testjoin.c
+	$(CC) $(CFLAGS) -c testjoin.c
+testjoin: testjoin.o start.o
+	$(LD) $(LDFLAGS) start.o testjoin.o -o testjoin.coff
+	../bin/coff2noff testjoin.coff testjoin
+	
+testjoinhalf.o: testjoinhalf.c
+	$(CC) $(CFLAGS) -c testjoinhalf.c
+testjoinhalf: testjoinhalf.o start.o
+	$(LD) $(LDFLAGS) start.o testjoinhalf.o -o testjoinhalf.coff
+	../bin/coff2noff testjoinhalf.coff testjoinhalf
+	
+test4.o: test4.c
+	$(CC) $(CFLAGS) -c test4.c
+test4: test4.o start.o
+	$(LD) $(LDFLAGS) start.o test4.o -o test4.coff
+	../bin/coff2noff test4.coff test4
+	
+test5.o: test5.c
+	$(CC) $(CFLAGS) -c test5.c
+test5: test5.o start.o
+	$(LD) $(LDFLAGS) start.o test5.o -o test5.coff
+	../bin/coff2noff test5.coff test5
+	
+testexit.o: testexit.c
+	$(CC) $(CFLAGS) -c testexit.c
+testexit: testexit.o start.o
+	$(LD) $(LDFLAGS) start.o testexit.o -o testexit.coff
+	../bin/coff2noff testexit.coff testexit
+	
+testexithalf.o: testexithalf.c
+	$(CC) $(CFLAGS) -c testexithalf.c
+testexithalf: testexithalf.o start.o
+	$(LD) $(LDFLAGS) start.o testexithalf.o -o testexithalf.coff
+	../bin/coff2noff testexithalf.coff testexithalf
+	
+test7.o: test7.c
+	$(CC) $(CFLAGS) -c test7.c
+test7: test7.o start.o
+	$(LD) $(LDFLAGS) start.o test7.o -o test7.coff
+	../bin/coff2noff test7.coff test7

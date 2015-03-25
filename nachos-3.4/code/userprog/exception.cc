@@ -27,6 +27,7 @@
 #include "syscall.h"
 #include "addrspace.h"   // FA98
 #include "sysdep.h"   // FA98
+#include "synch.h"
 
 // begin FA98
 
@@ -60,10 +61,20 @@ static void SWrite(char *buffer, int size, int id);
 
 void SExit(int status) {
 
-	if(currentThread->space) delete currentThread->space;
-	currentThread->space = 0;
+	if(Thread* parent = currentThread->GetParent())
+		if(parent->IsBlocked())
+			printf("\nParent #%d found, waking him up", parent->myID), scheduler->ReadyToRun(parent);
+		else
+			printf("\nParent #%d found, yet not asleep", parent->myID);
+	else
+		printf("\nParent #%d unfound", currentThread->parentID);
+					
+	if (currentThread->space)
+		delete currentThread->space, currentThread->space = 0;
 
-	printf("\nProcess %d exited %snormally(%d): ", currentThread->myID, status ? "ab" : "", status);
+
+
+	printf("\nProcess %d exited %snormally: ", currentThread->myID, status ? "ab" : "");
 
 	switch(status) {
 		case 0: 
@@ -86,6 +97,12 @@ void SExit(int status) {
 			break;
 		case 9: printf("Program file is not an executable file");
 			break;
+		case 17: printf("Join on child with parents");
+			break;
+		case 21: printf("Unable to open file ");
+			break;
+		case 100: printf("Filename length over 100");
+			break;
 		default: printf("UnknownExceptionType");
 			break;
 	}
@@ -93,33 +110,13 @@ void SExit(int status) {
 	currentThread->Finish();
 }
 
-void processCreator(int arg) {
+void RunProcess(int arg) {
 	//Benjamin: ensuring nachos updates important variables
 	currentThread->Yield();
 
-	char* filename = (char*)arg;
-	printf("\nCreating filename: %s, processID: %d", filename, currentThread->myID);
-	OpenFile *executable = fileSystem->Open(filename);
-    AddrSpace *space;
-
-    if (executable == NULL) {
-		printf("Unable to open file %s\n", filename);
-		return;
-    }
-	
-	space = new AddrSpace(executable);
-    if(0 != space->code) {
-		SExit(space->code);
-		return;
-	}
-
-	currentThread->space = space;
-
-    delete executable;			// close file
-	delete [] filename;
-
 	currentThread->space->InitRegisters();
 	currentThread->space->RestoreState();//load page table register
+
 	machine->Run();
 
 	ASSERT(FALSE);
@@ -151,44 +148,41 @@ ExceptionHandler(ExceptionType which)
 
 		switch(type)
 		{
-				
+
 			case SC_Yield:
-				printf("\nYielding: [%d]", currentThread->myID);
+				printf("\nProcess #%d calls Yield()", currentThread->myID);
 				currentThread->Yield();
 				break;
 
 			case SC_Exit:
 				{
-					printf("\nExit: [%d]", currentThread->myID);
-					IntStatus oldLevel = interrupt->SetLevel(IntOff);	// disable interrupts
-
-//wake up our parent if he's there
-					Thread *parent = currentThread->GetThread(currentThread->parentID);
-					if(parent) {
-						scheduler->ReadyToRun(parent);
-					}
-					(void) interrupt->SetLevel(oldLevel);	// re-enable interrupts
+					printf("\nProcess #%d calls Exit(%d)", currentThread->myID, arg1);
 					SExit(0);
-					
+
 				}
 				break;
 
 			case SC_Join:
 				{
-					printf("\nJoining: [%d]", currentThread->myID);
+					printf("\nProcess #%d calls Join(%d)", currentThread->myID, arg1);
 //turn interrupts off
 					IntStatus oldLevel = interrupt->SetLevel(IntOff);	// disable interrupts
 					
-					Thread *child = currentThread->GetThread(machine->ReadRegister(4));
+					Thread *child = currentThread->GetThread(arg1);
+
 					if(child) {
-						printf("\nChild(%d) found, going to sleep", child->myID);
-						child->parentID = currentThread->myID;
+						printf("\nChild #%d found, going to sleep", child->myID);
+						//currentThread->childID = child->myID;
+						if(-1 == child->parentID)
+							child->parentID = currentThread->myID;
+						else
+							printf("\nChild already has parents, deleting this thread"), SExit(17);
 						currentThread->Sleep();
-						printf("\nParent(%d) awakened", currentThread->myID);
+						printf("\nProcess #%d awakened", currentThread->myID);
 					}
-					else {
+					else
 						printf("\nChild unfound, not going to sleep");
-					}
+
 					(void) interrupt->SetLevel(oldLevel);	// re-enable interrupts
 //turn interrupts on
 					
@@ -197,18 +191,14 @@ ExceptionHandler(ExceptionType which)
 		
 			case SC_Exec:
 				{
-					printf("\nExec: [%d]", currentThread->myID);
+					
 //turn interrupts off
 					IntStatus oldLevel = interrupt->SetLevel(IntOff);
 					
-					Thread *child = new Thread("Exec");
-
-					machine->WriteRegister(2, child->myID);
-
+					
 
 //find a proper place to free this allocation
-					char* filename = new char[100];
-/* only one argument, so that’s in R4 */
+					char filename[100];
 					int buffadd = machine->ReadRegister(4);
 					int readByte;
 					if(!machine->ReadMem(buffadd,1,&readByte))
@@ -220,19 +210,38 @@ ExceptionHandler(ExceptionType which)
 						i++;
 						if(!machine->ReadMem(buffadd,1,&readByte))
 							break;//returns but idk if i want program to return
+						if(i > 100)
+							Exit(100);
 					}
 					filename[i] = 0;
-					printf(filename);
-/* now filename contains the file */ 
+/* now filename contains the file */
 
-					child->Fork(processCreator, (int)filename);
+					printf("\nProcess #%d calls Exec(\"%s\")", currentThread->myID, filename);
 
-					/*int pc = machine->ReadRegister(PCReg);
-					machine->WriteRegister(PrevPCReg,pc);
-					pc = machine->ReadRegister(NextPCReg);
-					machine->WriteRegister(PCReg,pc);
-					pc += 4;
-					machine->WriteRegister(NextPCReg,pc);*/
+					OpenFile *executable = fileSystem->Open(filename);
+    				
+    				if (executable == NULL) {
+						SExit(21);
+						return;
+    				}
+	
+					Thread *child = new Thread("exec");
+
+					machine->WriteRegister(2, child->myID);
+
+					child->space = new AddrSpace(executable);
+    				if(0 == child->space->code) {
+						child->Fork(RunProcess, 0);
+					} else {
+						int code = child->space->code;
+						delete child, child = 0;
+						SExit(code);
+					}
+
+   				 	delete executable;			// close file
+					
+
+
 					
 					//turn interrupts on
 					(void) interrupt->SetLevel(oldLevel);
@@ -319,11 +328,17 @@ ExceptionHandler(ExceptionType which)
 		SExit(1);
 		break;
 
+	case PageFaultException :
+
+		
+
+		break;
+
 		default :
-		      printf("\nUnexpected user mode exception %d %d\n", which, type);
-		//      if (currentThread->getName() == "main")
-		//      ASSERT(FALSE);
-		      SExit(-1);
+		printf("\nThread #%d\n\tUnexpected user mode exception %d %d\n", currentThread->myID, which, type);
+			//if (currentThread->getName() == "main")
+			//	ASSERT(FALSE);
+			SExit(-1);
 		break;
 	}
 	delete [] ch;

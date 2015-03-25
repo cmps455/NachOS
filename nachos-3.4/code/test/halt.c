@@ -15,6 +15,14 @@
 int
 main()
 {
-    Halt();
+	//Open("../test/sort");
+	/*
+	int i[250];
+	int y = i[9999];
+	int j = i[2];
+	*/
+	Write("Running Halt", 11, 1);
+	Yield();
+	//Halt();
     /* not reached */
 }
